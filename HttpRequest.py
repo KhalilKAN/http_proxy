@@ -1,12 +1,10 @@
-import socket
-import sys
-import threading
-import re
 from urllib.parse import urlparse
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
-BUFF_SIZE      = 4096
-LISTENING_PORT = 31337
-BACKLOG        = 20
+BUFF_SIZE = int(os.getenv('BUFF_SIZE'))
+
 
 class HttpRequest:
 
@@ -32,12 +30,17 @@ class HttpRequest:
             self.headers[k.title()] = v
 
         # process body
-        index_body_end = self._process_body(data[sep+4:])
+        index_body_end = self.get_body_length(data[sep+4:])
+        self.body = data[sep+4:][:index_body_end]  #Esto me da el mismo resultado haciendo data[sep+4:], no estoy seguro de por que aun
+        # self.body = data[sep+4:index_body_end]  #Esto me da el mismo resultado haciendo data[sep+4:], no estoy seguro de por que aun
 
         if index_body_end is None:
             self.raw_data      = data[0 : sep+4]    
         else:
-            self.raw_data      = data[0 : sep+4+index_body_end]
+            self.raw_data      = data[0 : sep+4+index_body_end] #creo que seria lo mismo hacer data[:len(data)]
+        
+        # print(sep+4+index_body_end)
+        # print(len(data))
 
 
     def reformat_request_line(self):
@@ -62,9 +65,11 @@ class HttpRequest:
         return self.request_line.split(" ")[2]
 
 
-    def _process_body(self, data):
+    #This function return body content length
+    def get_body_length(self, data):
         if len(data) == 0:
-            return
+            # return
+            return None
         
         req_method = self.request_method()
 
@@ -76,7 +81,7 @@ class HttpRequest:
             raise Exception("Transfer Encoding: chunked maybe?")
         
         content_length = int(content_length)
-        self.body = data[:content_length]        
+        # self.body = data[:content_length]        
         return content_length
 
 
@@ -110,7 +115,7 @@ class HttpRequest:
 
 
     @classmethod
-    def from_sock(cls, sock):        
+    def from_sock(cls, sock): #Returns all the requests that arrived        
         data = None
         data_chunk = sock.recv(BUFF_SIZE)
         if len(data_chunk) > 0:
@@ -137,73 +142,3 @@ class HttpRequest:
             j += 1
         
         return result
-
-
-def main():
-
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind(('', LISTENING_PORT))
-        s.listen(BACKLOG)
-        print("[*] Server started successfully [{}]" .format(LISTENING_PORT))
-    except Exception as e:
-        print(e)
-        sys.exit(2)
-
-    while True:
-        try:
-            client_sock, addr = s.accept()            
-            threading.Thread(target=proxy_connection, args=(client_sock, addr)).start()
-        except KeyboardInterrupt:        
-            print("\n[*] Shutting down...")                    
-            s.close()
-            sys.exit(1)
-
-
-def proxy_connection(client_sock, addr):
-    print(f"+ new connection {client_sock} from {addr}")
-    
-    client_sock.settimeout(1)
-
-    http_requests = HttpRequest.from_sock(client_sock)
-    for req in http_requests:
-        print(req)
-
-        # Extract destination
-        target_url = req.request_path()        
-        parsed_url = urlparse(target_url)
-        if (parsed_url.scheme != "http"):
-            raise Exception("WHAT?")
-
-        if ":" in parsed_url.netloc:            
-            target_host, target_port = parsed_url.netloc.split(":")
-            target_port = int(target_port)
-        else:
-            target_host = parsed_url.netloc
-            target_port = 80
-
-        print(f"opening connection to {target_host}:{target_port}")
-        sock = socket.socket()        
-
-        sock.connect((socket.gethostbyname(target_host), target_port))
-        sock.sendall(req.raw_bytes())        
-
-        sock.settimeout(1)
-        recv_data = b''
-        while True:
-            try:
-                data_chunk = sock.recv(BUFF_SIZE)            
-                recv_data += data_chunk
-            except TimeoutError:
-                break
-
-        sock.close()
-
-        client_sock.sendall(recv_data)
-
-    client_sock.close()
-    
-    
-if __name__ == "__main__":
-    main()

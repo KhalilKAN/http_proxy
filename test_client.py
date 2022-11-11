@@ -13,6 +13,7 @@ proxies = {
 
 target_url = "http://slac.com/"
 
-r = requests.get(target_url, proxies=proxies)
-
+r = requests.post(target_url, proxies=proxies, data={"anda":"hola"})
 print(r.text)
+# r = requests.get(target_url, proxies=proxies)
+# print(r.text)
