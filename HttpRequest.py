@@ -32,15 +32,12 @@ class HttpRequest:
         # process body
         index_body_end = self.get_body_length(data[sep+4:])
         self.body = data[sep+4:][:index_body_end]  #Esto me da el mismo resultado haciendo data[sep+4:], no estoy seguro de por que aun
-        # self.body = data[sep+4:index_body_end]  #Esto me da el mismo resultado haciendo data[sep+4:], no estoy seguro de por que aun
 
         if index_body_end is None:
             self.raw_data      = data[0 : sep+4]    
         else:
             self.raw_data      = data[0 : sep+4+index_body_end] #creo que seria lo mismo hacer data[:len(data)]
         
-        # print(sep+4+index_body_end)
-        # print(len(data))
 
 
     def reformat_request_line(self):
@@ -127,7 +124,8 @@ class HttpRequest:
             try:
                 data_chunk = sock.recv(BUFF_SIZE)            
                 data += data_chunk
-            except TimeoutError:
+            except:
+                print("error?")
                 break
 
         result = []

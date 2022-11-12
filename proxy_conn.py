@@ -35,11 +35,16 @@ def proxy_connection(client_sock, addr):
         target_host, target_port = get_destination_data(req)
         print(f"opening connection to {target_host}:{target_port}")
 
+        # ------- PUNTO 1 -------
+        #Tengo entendido, que esto envia desde el proxy hacia el site
         sock = socket.socket()        
         sock.connect((socket.gethostbyname(target_host), target_port))
         sock.sendall(req.raw_bytes())        
         sock.settimeout(1)
+        
 
+        # ------- PUNTO 2 -------
+        #Tengo entendido, que esto envia desde el proxy hacia el cliente origen
         recv_data = b''
         while True:
             try:
@@ -47,11 +52,13 @@ def proxy_connection(client_sock, addr):
                 recv_data += data_chunk
             except TimeoutError:
                 break
-
-        sock.close()
+        
         client_sock.sendall(recv_data)
 
-        print(recv_data)
+        print("----- Response: Data desde el proxy hacia el cliente ---")
+        response = HttpRequest(recv_data)
+        print(response)
+        sock.close()
 
     client_sock.close()
     
