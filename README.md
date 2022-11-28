@@ -9,7 +9,7 @@ To begin, set the browser proxy to the defined port. The default value is **3133
 # Mode
 
 The mode function allows you to display the **header**, **body** or **both**.
-To configure it, go to the **.env** file and set the desired mode.
+To configure it, go to the **.env** file and set the desired mode. By default, it only displays the **headers**
 
 # Payload
 
