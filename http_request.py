@@ -1,9 +1,11 @@
 from urllib.parse import urlparse
 import os
 from dotenv import load_dotenv
+from payload import payload_header
 load_dotenv()
 
 BUFF_SIZE = int(os.getenv('BUFF_SIZE'))
+
 
 
 class HttpRequest:
@@ -14,8 +16,8 @@ class HttpRequest:
     Transfer-Encoding: chunked is not supported yet
     """
     def __init__(self, data):        
-        self.request_line  = None # GET /foobar HTTP/1.1 (string)
-        self.headers       = {}   # Dictionary of strings
+        self.request_line  = None 
+        self.headers       = {}   
         self.body          = None
         
         # split headers from body
@@ -24,31 +26,44 @@ class HttpRequest:
         headers_blob      = data[0:sep].decode('utf-8')       
         headers           = headers_blob.split("\r\n")
         self.request_line = headers.pop(0)
-
-        for header in headers:
-            k, v = header.split(": ", 1)
-            self.headers[k.title()] = v
+        self.get_headers_format(headers, False)
+        self.get_headers_format(payload_header, True)
 
         # process body
         index_body_end = self.get_body_length(data[sep+4:])
-        self.body = data[sep+4:][:index_body_end]  #Esto me da el mismo resultado haciendo data[sep+4:], no estoy seguro de por que aun
+        self.body = data[sep+4:][:index_body_end] 
 
         if index_body_end is None:
             self.raw_data      = data[0 : sep+4]    
         else:
-            self.raw_data      = data[0 : sep+4+index_body_end] #creo que seria lo mismo hacer data[:len(data)]
-        
+            self.raw_data      = data[0 : sep+4+index_body_end] 
 
 
-    def reformat_request_line(self):
-        method, target_url, version  = self.request_line.split(" ")        
+    def get_headers_format(self, array, payload):
+        for header in array:
+            k, v = header.split(": ") if payload else header.split(": ", 1)
+            self.headers[k.title()] = v
 
-        parsed_url = urlparse(target_url)
-        path       = parsed_url.path + parsed_url.params + parsed_url.query
+    def get_headers(self):
+        data = ""        
+        for k, v in self.headers.items():
+            data += "{}: {}\r\n".format(k, v)
+        return data
+    
+    def get_body(self):
+        return self.body.decode("utf-8")
 
-        res = "{} {} {}".format(method, path, version)
-        return res
+    def get_all(self):
+        return self.raw_data.decode("utf-8")
 
+    def get_data(self, mode):
+        functions = {
+            "headers": self.get_headers(),
+            "body": self.get_body(),
+            "all": self.get_all()
+        }
+
+        return functions[mode]
 
     def request_method(self):
         return self.request_line.split(" ")[0]
@@ -57,15 +72,9 @@ class HttpRequest:
     def request_path(self):        
         return self.request_line.split(" ")[1]
 
-
-    def request_version(self):
-        return self.request_line.split(" ")[2]
-
-
     #This function return body content length
     def get_body_length(self, data):
         if len(data) == 0:
-            # return
             return None
         
         req_method = self.request_method()
@@ -78,7 +87,7 @@ class HttpRequest:
             raise Exception("Transfer Encoding: chunked maybe?")
         
         content_length = int(content_length)
-        # self.body = data[:content_length]        
+     
         return content_length
 
 
@@ -90,6 +99,15 @@ class HttpRequest:
         return self.raw_data.decode('utf-8')
 
     
+    def reformat_request_line(self):
+        method, target_url, version  = self.request_line.split(" ")        
+
+        parsed_url = urlparse(target_url)
+        path       = parsed_url.path + parsed_url.params + parsed_url.query
+
+        res = "{} {} {}".format(method, path, version)
+        return res
+
     def raw_bytes(self):
         data = b""
         
@@ -98,11 +116,14 @@ class HttpRequest:
         data += req_line + b'\r\n'
         
         ## add headers
-        for k, v in self.headers.items():
-            h = "{}: {}\r\n".format(k, v)
+        for i, value in enumerate(self.headers.items()):
+            if(i == len(self.headers)-1):
+                h = "{}: {}".format(value[0], value[1])
+            else:
+                h = "{}: {}\r\n".format(value[0], value[1])
             data += h.encode('utf-8')
 
-        data += b'\r\n'
+        data += b'\r\n\r\n'
 
         if self.body:
             data += self.body
@@ -125,7 +146,6 @@ class HttpRequest:
                 data_chunk = sock.recv(BUFF_SIZE)            
                 data += data_chunk
             except:
-                print("error?")
                 break
 
         result = []
@@ -136,7 +156,8 @@ class HttpRequest:
             instance = HttpRequest(data[parsed_data:])
             result.append(instance) # add to the result set
             parsed_data += len(instance)
-            print(f"--> parsed {j} requests from data")
+            print(f"\n[i] Parsed {j} requests from data\n")
+            print(f"[i] Request ---> {instance.request_line}")
             j += 1
         
         return result

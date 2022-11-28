@@ -1,11 +1,12 @@
 import socket
 from urllib.parse import urlparse
-from HttpRequest import HttpRequest
+from http_request import HttpRequest
 import os
 from dotenv import load_dotenv
 load_dotenv()
 
 BUFF_SIZE = int(os.getenv('BUFF_SIZE'))
+MODE = os.getenv('MODE')
 
 def get_destination_data(req):
     # Extract destination
@@ -25,26 +26,23 @@ def get_destination_data(req):
     return [target_host, target_port]
 
 def proxy_connection(client_sock, addr):
-    print(f"+ new connection {client_sock} from {addr}")
+    print(f"[+] New connection {client_sock} from {addr}")
     
-    client_sock.settimeout(1)
+    client_sock.settimeout(2)
 
     http_requests = HttpRequest.from_sock(client_sock)
     for req in http_requests:
-        print(req)
+        print(req.get_data(MODE))
         target_host, target_port = get_destination_data(req)
-        print(f"opening connection to {target_host}:{target_port}")
+        print(f"\n[i] Opening connection to {target_host}:{target_port}\n")
 
         # ------- PUNTO 1 -------
-        #Tengo entendido, que esto envia desde el proxy hacia el site
         sock = socket.socket()        
         sock.connect((socket.gethostbyname(target_host), target_port))
         sock.sendall(req.raw_bytes())        
-        sock.settimeout(1)
+        sock.settimeout(2)
         
-
         # ------- PUNTO 2 -------
-        #Tengo entendido, que esto envia desde el proxy hacia el cliente origen
         recv_data = b''
         while True:
             try:
@@ -54,10 +52,9 @@ def proxy_connection(client_sock, addr):
                 break
         
         client_sock.sendall(recv_data)
-
-        print("----- Response: Data desde el proxy hacia el cliente ---")
         response = HttpRequest(recv_data)
-        print(response)
+        print(f"[i] Response ---> {response.request_line}")
+        print(response.get_data(MODE))
         sock.close()
 
     client_sock.close()

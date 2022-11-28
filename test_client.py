@@ -11,9 +11,9 @@ proxies = {
               "ftp"   : ftp_proxy
             }
 
-target_url = "http://slac.com/"
+target_url = "http://eu.httpbin.org/"
 
-r = requests.post(target_url, proxies=proxies, data={"anda":"hola"})
+# r = requests.post(target_url, proxies=proxies, data={"anda":"hola"})
+r = requests.get(target_url, proxies=proxies)
 print(r.text)
-# r = requests.get(target_url, proxies=proxies)
-# print(r.text)
+
